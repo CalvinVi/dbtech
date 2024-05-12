@@ -12,6 +12,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import de.htwberlin.exceptions.*;
+import oracle.jdbc.OracleConnectionWrapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -189,10 +190,32 @@ public class VersicherungJdbc implements IVersicherungJdbc {
 
 
   @Override
-    public BigDecimal calcMonatsrate(Integer vertragsId) {
-      L.info("vertragsId: " + vertragsId);
-      L.info("ende");
-      return null;
-    }
+  public BigDecimal calcMonatsrate(Integer vertragsId) throws VertragExistiertNichtException{
+    L.info("vertragsId: " + vertragsId);
+    BigDecimal monatsrate = BigDecimal.ZERO;
+    try {String sql="SELECT SUM(dp.Preis) AS Monatsrate FROM Vertrag v " +
+            "JOIN Deckung d ON v.ID = d.Vertrag_FK " +
+            "JOIN Deckungsart da ON d.Deckungsart_FK = da.ID " +
+            "JOIN Deckungsbetrag db ON da.ID = db.Deckungsart_FK " +
+            "JOIN Deckungspreis dp ON da.ID = dp.Deckungsbetrag_FK " +
+            "WHERE v.ID = ? " +
+            "AND v.Versicherungsbeginn BETWEEN dp.Gueltig_Von AND dp.Gueltig_Bis";
+    PreparedStatement statement = connection.prepareStatement(sql) ;
+      statement.setInt(1, vertragsId);
+      ResultSet resultSet = statement.executeQuery();
 
+      if (resultSet.next()) {
+        monatsrate = resultSet.getBigDecimal("Monatsrate");
+        if (monatsrate == null) {
+          monatsrate = BigDecimal.ZERO;
+        }
+      }
+    } catch (SQLException e) {
+      e.printStackTrace();
+      throw new VertragExistiertNichtException(vertragsId);
+    }
+    System.out.println(monatsrate);
+    L.info("ende");
+    return monatsrate;
   }
+}
